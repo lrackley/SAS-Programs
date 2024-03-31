@@ -20,6 +20,7 @@ libname adam '/home/lrackley0/CDISC Pilot/ADaM';
 
 *Filter on intent-to-treat population;
 data adsl;
+   length agegr2 $5;
    set adam.adsl;
    where ITTFL = 'Y';
    *deriving new age variable;
