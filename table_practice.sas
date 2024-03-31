@@ -112,7 +112,7 @@ title height=10pt j=l "~S={fontweight=light fontstyle=roman}Protocol: CDISCPILOT
  j=r "~S={fontweight=light fontstyle=roman}PAGE X of Y";
 title3 height=12pt "~S={fontstyle=roman}Summary of Demographic and Baseline Characteristics";
 footnote3 height=9pt j=l "~S={fontweight=bold fontstyle=roman}Source:
-~S={fontweight=light fontstyle=roman}d:\t-dm-sgf.rtf"
+~S={fontweight=light fontstyle=roman}C:\t-dm-sgf.rtf"
  j=r "~S={fontsize=9pt fontweight=bold fontstyle=roman}Date:
 ~S={fontweight=light fontstyle=roman}&sysdate9.";
 proc report data = final split='*' nocenter missing
