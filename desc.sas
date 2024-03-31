@@ -32,7 +32,7 @@ run;
 
 data ds&grp.;
    length cat $200;
-   set agestats2_t;
+   set &var.stats2_t;
    cat = put(_name_,$catf.);
    rowlabel = "&lbl";
    roword = input(cat,rowf.);
