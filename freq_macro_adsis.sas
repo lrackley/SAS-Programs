@@ -1,94 +1,82 @@
-********************
-Begin code for Q1
-*******************;
-data heart;
-	set echo.vs;
-	where vstestcd='HR' and VSBLFL='Y';
-	keep usubjid vstestcd vsblfl vsstresn;
+libname bios511 "/home/lrackley0/BIOS 511";
+*include the proc format;
+proc format;
+   value fmtA 
+   1-3='At Least Somewhat Difficult' 
+   4='A Little Difficult' 
+   5='No Difficulty';
 run;
 
-proc sql;	
-	create table want as 
-	select dm.usubjid, vsstresn, 
-	case when vsstresn > 60 then '>60'
-	when vsstresn > .z and vsstresn <= 60 then '<=60' end as hr_above_60
-	from echo.dm as dm
-	join heart as h
-	on h.usubjid=dm.usubjid;
+*Create macro variable list of allowed qstestcd values;
+proc sql noprint;
+   select distinct qstestcd into: cdlist separated by ' ' 
+     from bios511.adsis 
+   where prxmatch('m/^ITEM(0[1-9]|1[0-6])/', strip(qstestcd));
 quit;
 
-title "Percent of subjects with baseline HR above 60";
-proc freq data=want;
-	tables hr_above_60 / missprint;
-run;
-title;
+%put &=cdlist;
+/* options minoperator mlogic mprint symbolgen; */
 
-********************
-Begin code for Q2
-********************;
-data vs;
-	set echo.vs;
-	where vstestcd in ('SYSBP','DIABP') and visitnum in (1,5);
-run;
+%macro freq(cd=, fmt=) / minoperator ;
+   %if not (&cd in (&cdlist)) %then
+      %do;
+         %put ERROR: Not an acceptable value of cd.;
+         %abort;
+      %end;
+   %else
+      %do;
+         %*get the corresponding test name;
 
-proc sort data=vs;
-	by usubjid visitnum;
-run;
+         data _null_;
+            set bios511.adsis(keep=qstestcd qstest);
+            where qstestcd="&cd";
+            call symputx('test', qstest);
+         run;
+         
+         %*Generate PROC FREQ output but do not print it;
+         proc freq data=bios511.adsis noprint;
+            tables aval / out=freq_&cd.;
+            where qstestcd="&cd";
 
-proc transpose data=vs out=vs_T;
-	by usubjid visitnum;
-	var vsstresn;
-	id vstestcd;
-run;
+            %if not (%upcase(&fmt) in (FMTA NONE)) %then
+               %do;
+                  %put ERROR: Only allowed values are NONE or FMTA.;
+                  %abort; %*Print error if incorrect format is used;
+               %end;
+            %else
+               %do;
 
-data pulse;
-	set vs_t;
-	pulse_pressure=sysbp-diabp;
-run;
+                  %if &fmt=FMTA %then 
+                     %do;
+                        format aval &fmt..;%*Format aval with FMTA if specified;
+                     %end;
+                  %else %if &fmt=NONE %then %*Do not format if no format is specified;
+                     %do;
+                     %end;
+               %end;
+         run;
 
-proc sort data=pulse;		
-	by usubjid ;
-run;
+         %*Create text versions of count and percents from PROC FREQ output dataset;
+         data freq_&cd._1;
+            set freq_&cd.;
+            cnt=strip(put(count, 8.));
+            pct=strip(put(percent, 5.2));
+         run;
 
-proc transpose data=pulse out=pulse_t prefix=visit;
-	by usubjid;
-	var pulse_pressure;
-	id visitnum;
-run;
+         title1 "Frequency Analysis of Survey Item %substr(&cd,5)"  bold height=0.4cm color=black;
+         title2 "&test" color=black bold height=0.25cm;
 
-data pulse2;
-	set pulse_t;
-	chg=visit5-visit1;
-	
-	keep usubjid chg;
-run;
+         proc report data=freq_&cd._1 split='*';
+            columns aval cnt pct;
+            define aval / "* * Analysis Value";
+            define cnt / "* Frequency*Count";
+            define pct / "Percent of*Total*Frequency";
+         run;
 
-data echomax;
-	set echo.dm;
-	where armcd="ECHOMAX";
-	keep usubjid armcd;
-run;
-
-proc sort data=pulse2;
-	by usubjid;
-run;
-
-proc sort data=echomax;
-	by usubjid;
-run;
-
-data combine;	
-	merge pulse2 echomax(in=a);
-	by usubjid;
-	if a;
-	
-	label chg='Change in pulse pressure Week 0 to Week 32';
-run;
-
-title "Histogram of Change in Pulse Pressure Week 0 to Week 32";
-ods select histogram;
-proc univariate data=combine;
-	histogram chg / normal;
-	inset mean (8.2) std='SD' (8.3);
-run;
-title;
+      %end;
+%mend freq;
+options nodate nonumber;
+ods pdf file = "/home/lrackley0/BIOS 511/Final/macrotest.pdf" startpage=yes;
+%freq(cd=ITEM16, fmt=FMTA) ;
+%freq(cd=ITEM02, fmt=NONE) ;
+ods pdf close;
